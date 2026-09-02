@@ -1,0 +1,8 @@
+.env
+CONTEXT.md
+__pycache__/
+*.pyc
+.DS_Store
+venv/
+samples_mp3/
+raw/
