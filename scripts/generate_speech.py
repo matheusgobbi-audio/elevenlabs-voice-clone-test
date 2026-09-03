@@ -1,10 +1,10 @@
 """
-Objetivo: pegar cada voice_id criado (um por condição de gravação) e pedir
-para a API gerar a MESMA frase de teste em cada um.
+Goal: take each voice_id created (one per recording condition) and ask
+the API to generate the SAME test sentence with each of them.
 
-Isso isola a variável que estamos testando (qualidade da gravação de
-entrada), porque o texto gerado é idêntico em todas as condições, só a
-gravação original que deu origem ao clone muda.
+This isolates the variable under test (quality of the input recording),
+because the generated text is identical across all conditions; only the
+original recording behind each clone changes.
 """
 
 import os
@@ -18,11 +18,11 @@ load_dotenv()
 API_KEY = os.getenv("ELEVENLABS_API_KEY")
 if not API_KEY:
     raise SystemExit(
-        "ELEVENLABS_API_KEY não encontrada. Copie .env.example para .env "
-        "e cole sua chave dentro dele."
+        "ELEVENLABS_API_KEY not found. Copy .env.example to .env "
+        "and paste your key into it."
     )
 
-# Mesma frase para todas as condições, para a comparação ser justa.
+# Same sentence for every condition, so the comparison is fair.
 TEST_TEXT = (
     "This is a voice cloning test to evaluate how the quality of the "
     "original recording affects the generated result."
@@ -44,13 +44,13 @@ def generate_speech(voice_id: str, condition_name: str):
     output_path = RESULTS_DIR / f"generated_{condition_name}.mp3"
     with open(output_path, "wb") as f:
         f.write(response.content)
-    print(f"Gerado: {output_path}")
+    print(f"Generated: {output_path}")
 
 
 def main():
     voice_ids_path = RESULTS_DIR / "voice_ids.json"
     if not voice_ids_path.exists():
-        raise SystemExit("Rode clone_voice.py primeiro, para gerar voice_ids.json.")
+        raise SystemExit("Run clone_voice.py first, to generate voice_ids.json.")
 
     with open(voice_ids_path) as f:
         voice_ids = json.load(f)
@@ -58,7 +58,7 @@ def main():
     for condition_name, voice_id in voice_ids.items():
         output_path = RESULTS_DIR / f"generated_{condition_name}.mp3"
         if output_path.exists():
-            print(f"Já gerado, pulando: {condition_name}")
+            print(f"Already generated, skipping: {condition_name}")
             continue
         generate_speech(voice_id, condition_name)
 

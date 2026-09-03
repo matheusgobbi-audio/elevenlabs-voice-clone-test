@@ -1,16 +1,16 @@
 """
-Objetivo: pegar cada gravação em samples/ (em qualquer formato comum:
-wav, mp3, m4a, ogg, oga, flac) e criar um clone de voz separado na
-ElevenLabs para cada uma (Instant Voice Cloning).
+Goal: take each recording in samples/ (in any common format: wav, mp3,
+m4a, ogg, oga, flac) and create a separate voice clone on ElevenLabs
+for each one (Instant Voice Cloning).
 
-Antes de enviar, cada arquivo é convertido para MP3 320kbps (acima do
-mínimo de 192kbps recomendado pela ElevenLabs; a documentação deles
-afirma que taxas maiores não trazem diferença perceptível na qualidade
-do clone, mas WAV pode causar problemas no upload, então MP3 continua
-sendo a escolha certa). A conversão é aplicada igual em todas as
-condições, então não introduz viés na comparação.
+Before uploading, each file is converted to MP3 320kbps (above the
+192kbps minimum recommended by ElevenLabs; their docs state that higher
+bitrates bring no perceptible difference in clone quality, but WAV can
+cause upload problems, so MP3 is still the right choice). The conversion
+is applied equally to every condition, so it introduces no bias in the
+comparison.
 
-Requer ffmpeg instalado e disponível no PATH.
+Requires ffmpeg installed and available on PATH.
 """
 
 import os
@@ -25,8 +25,8 @@ load_dotenv()
 API_KEY = os.getenv("ELEVENLABS_API_KEY")
 if not API_KEY:
     raise SystemExit(
-        "ELEVENLABS_API_KEY não encontrada. Copie .env.example para .env "
-        "e cole sua chave dentro dele."
+        "ELEVENLABS_API_KEY not found. Copy .env.example to .env "
+        "and paste your key into it."
     )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,10 +48,10 @@ MIME_TYPES = {
     ".flac": "audio/flac",
 }
 
-# studio_96_32 é a captura deliberadamente elevada (WAV nativo,
-# 96kHz/32bit), comparada contra a entrega padrão de estúdio
-# (studio_clean, já em MP3). Não convertida, para preservar o
-# formato nativo dessa comparação específica.
+# studio_96_32 is the deliberately elevated-spec capture (96kHz,
+# lossless), compared against the standard studio delivery
+# (studio_clean, already MP3). Not converted, to preserve the native
+# format of that specific comparison.
 SKIP_CONVERSION = {"studio_96_32"}
 
 
@@ -63,7 +63,7 @@ def find_sample_files():
 
 
 def ensure_mp3(audio_path: Path) -> Path:
-    """Converte para MP3 320kbps, reaproveitando se já convertido antes."""
+    """Convert to MP3 320kbps, reusing the file if already converted before."""
     mp3_path = CONVERTED_DIR / f"{audio_path.stem}.mp3"
     if mp3_path.exists():
         return mp3_path
@@ -73,7 +73,7 @@ def ensure_mp3(audio_path: Path) -> Path:
         check=True,
         capture_output=True,
     )
-    print(f"Convertido: {audio_path.name} -> {mp3_path.name}")
+    print(f"Converted: {audio_path.name} -> {mp3_path.name}")
     return mp3_path
 
 
@@ -86,7 +86,7 @@ def clone_voice(name: str, audio_path: Path) -> str:
         response = requests.post(url, headers=HEADERS, data=data, files=files)
     response.raise_for_status()
     voice_id = response.json()["voice_id"]
-    print(f"Clone criado: {name} -> {voice_id}")
+    print(f"Clone created: {name} -> {voice_id}")
     return voice_id
 
 
@@ -94,8 +94,8 @@ def main():
     audio_files = find_sample_files()
     if not audio_files:
         raise SystemExit(
-            "Nenhum arquivo de áudio encontrado em samples/ "
-            "(formatos aceitos: wav, mp3, m4a, ogg, oga, flac)."
+            "No audio files found in samples/ "
+            "(accepted formats: wav, mp3, m4a, ogg, oga, flac)."
         )
 
     output_path = RESULTS_DIR / "voice_ids.json"
@@ -105,20 +105,20 @@ def main():
             voice_ids = json.load(f)
 
     for audio_path in audio_files:
-        condition_name = audio_path.stem  # ex: phone_home_open
+        condition_name = audio_path.stem  # e.g. phone_home_open
         if condition_name in voice_ids:
-            print(f"Já clonado, pulando: {condition_name}")
+            print(f"Already cloned, skipping: {condition_name}")
             continue
         if condition_name in SKIP_CONVERSION:
             upload_path = audio_path
-            print(f"Enviando sem conversão (teste de especificação): {condition_name}")
+            print(f"Uploading without conversion (spec test): {condition_name}")
         else:
             upload_path = ensure_mp3(audio_path)
         voice_ids[condition_name] = clone_voice(condition_name, upload_path)
         with open(output_path, "w") as f:
             json.dump(voice_ids, f, indent=2)
 
-    print(f"\nAtualizado em {output_path}")
+    print(f"\nUpdated {output_path}")
 
 
 if __name__ == "__main__":

@@ -1,18 +1,19 @@
 """
-Objetivo: comparar visualmente a gravação de REFERÊNCIA (frase curta,
-mesma que a IA gera) com o áudio que a IA gerou a partir do clone
-daquela condição, usando espectrogramas.
+Goal: visually compare the REFERENCE recording (short sentence, the same
+one the API generates) against the audio the API generated from that
+condition's clone, using spectrograms.
 
-Importante: a comparação usa reference/{condition}.wav, não o
-parágrafo longo em samples/ usado para a clonagem. Textos diferentes
-invalidariam a comparação.
+Important: the comparison uses reference/{condition}.wav, not the long
+paragraph in samples/ used for cloning. Different text would invalidate
+the comparison.
 
-Isso transforma "eu acho que ficou pior" em algo concreto, que dá pra
-mostrar e explicar tecnicamente no README.
+This turns "I think it got worse" into something concrete that can be
+shown and explained technically in the README.
 """
 
 import json
 from pathlib import Path
+import numpy as np
 import librosa
 import librosa.display
 import matplotlib.pyplot as plt
@@ -33,31 +34,61 @@ def find_reference_file(condition_name: str):
     return None
 
 
+# Fixed scale for every spectrogram, so the comparison across conditions
+# is visual and direct: same colormap, same dynamic-range window (dB) and
+# same frequency limit on every panel.
+CMAP = "magma"
+DB_FLOOR = -80.0   # bottom of the color scale, in dB below the signal's own peak
+DB_CEIL = 0.0      # top of the color scale (peak = 0 dB)
+FMAX = 16000       # Hz; the API output never exceeds this, so it is the
+                   # band where the comparison is meaningful
+
+# ref=np.max normalizes each panel by its own peak: the silence between
+# words drops to the dark end of the colormap and speech shows up bright,
+# so the noise-floor difference between conditions is immediately
+# visible. The scale becomes relative (dynamic), not absolute level
+# across conditions.
+def _spectrogram_db(y):
+    return librosa.amplitude_to_db(abs(librosa.stft(y)), ref=np.max)
+
+
 def plot_comparison(original_path: Path, generated_path: Path, condition_name: str):
     y_orig, sr_orig = librosa.load(original_path, sr=None)
     y_gen, sr_gen = librosa.load(generated_path, sr=None)
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
 
-    d_orig = librosa.amplitude_to_db(abs(librosa.stft(y_orig)), ref=1.0)
-    librosa.display.specshow(d_orig, sr=sr_orig, x_axis="time", y_axis="hz", ax=axes[0])
-    axes[0].set_title(f"Original - {condition_name}")
+    for ax, (title, y, sr) in zip(
+        axes,
+        [
+            (f"Original - {condition_name}", y_orig, sr_orig),
+            (f"AI-generated - {condition_name}", y_gen, sr_gen),
+        ],
+    ):
+        img = librosa.display.specshow(
+            _spectrogram_db(y),
+            sr=sr,
+            x_axis="time",
+            y_axis="hz",
+            ax=ax,
+            cmap=CMAP,
+            vmin=DB_FLOOR,
+            vmax=DB_CEIL,
+        )
+        ax.set_title(title)
+        ax.set_ylim(0, FMAX)
 
-    d_gen = librosa.amplitude_to_db(abs(librosa.stft(y_gen)), ref=1.0)
-    librosa.display.specshow(d_gen, sr=sr_gen, x_axis="time", y_axis="hz", ax=axes[1])
-    axes[1].set_title(f"Gerado pela IA - {condition_name}")
-
-    plt.tight_layout()
+    fig.colorbar(img, ax=axes, format="%+2.0f dB", location="right", pad=0.02)
     output_path = RESULTS_DIR / f"spectrogram_{condition_name}.png"
-    plt.savefig(output_path, dpi=150)
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Salvo: {output_path}")
+    print(f"Saved: {output_path}")
 
 
 def main():
     voice_ids_path = RESULTS_DIR / "voice_ids.json"
     if not voice_ids_path.exists():
-        raise SystemExit("Rode clone_voice.py e generate_speech.py primeiro.")
+        raise SystemExit("Run clone_voice.py and generate_speech.py first.")
 
     with open(voice_ids_path) as f:
         voice_ids = json.load(f)
@@ -68,7 +99,7 @@ def main():
         if original_path and generated_path.exists():
             plot_comparison(original_path, generated_path, condition_name)
         else:
-            print(f"Aviso: faltando reference/{condition_name}.* ou generated_{condition_name}.mp3, pulando.")
+            print(f"Warning: missing reference/{condition_name}.* or generated_{condition_name}.mp3, skipping.")
 
 
 if __name__ == "__main__":
