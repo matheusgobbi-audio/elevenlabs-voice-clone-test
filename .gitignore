@@ -1,5 +1,6 @@
 .env
 CONTEXT.md
+DEVELOPMENT_LOG.md
 __pycache__/
 *.pyc
 .DS_Store
